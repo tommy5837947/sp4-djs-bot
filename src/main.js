@@ -1,8 +1,10 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js'
 import vueInit from '@/core/vue'
+import { loadCommands } from '@/core/loader'
 import dotenv from 'dotenv'
 
 vueInit()
+loadCommands()
 dotenv.config()
 
 // Create a new client instance
