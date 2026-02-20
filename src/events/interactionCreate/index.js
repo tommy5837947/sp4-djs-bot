@@ -4,10 +4,23 @@ import { listReloadTargetNames } from "@/core/loader"
 import { handleButtonRoleInteraction } from "@/core/buttonRoles"
 import { handleHelpMenuInteraction, HELP_MENU_CUSTOM_ID } from "@/core/helpCenter"
 import { handleButtonRoleContextModal, isButtonRoleContextModal } from "@/core/buttonRoleContext"
+import { getUserPermissionLevel, hasPermission } from "@/core/permissions"
 
 export const event = {
     name: Events.InteractionCreate,
     once: false,
+}
+
+const safeErrorReply = async (interaction, text) => {
+    try {
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: text, flags: MessageFlags.Ephemeral })
+        } else {
+            await interaction.reply({ content: text, flags: MessageFlags.Ephemeral })
+        }
+    } catch (replyErr) {
+        console.error("回覆互動錯誤訊息失敗:", replyErr)
+    }
 }
 
 export const action = async(interaction) => {
@@ -16,11 +29,7 @@ export const action = async(interaction) => {
             await handleButtonRoleContextModal(interaction)
         } catch (err) {
             console.error("context modal 處理失敗:", err)
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: "處理綁定表單時發生錯誤。", flags: MessageFlags.Ephemeral })
-            } else {
-                await interaction.reply({ content: "處理綁定表單時發生錯誤。", flags: MessageFlags.Ephemeral })
-            }
+            await safeErrorReply(interaction, "處理綁定表單時發生錯誤。")
         }
         return
     }
@@ -31,11 +40,7 @@ export const action = async(interaction) => {
             await handleHelpMenuInteraction(interaction)
         } catch (err) {
             console.error("help menu 處理失敗:", err)
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: "處理說明選單時發生錯誤。", flags: MessageFlags.Ephemeral })
-            } else {
-                await interaction.reply({ content: "處理說明選單時發生錯誤。", flags: MessageFlags.Ephemeral })
-            }
+            await safeErrorReply(interaction, "處理說明選單時發生錯誤。")
         }
         return
     }
@@ -46,11 +51,7 @@ export const action = async(interaction) => {
             await handleButtonRoleInteraction(interaction)
         } catch (err) {
             console.error("button role 處理失敗:", err)
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: "處理按鈕時發生錯誤。", flags: MessageFlags.Ephemeral })
-            } else {
-                await interaction.reply({ content: "處理按鈕時發生錯誤。", flags: MessageFlags.Ephemeral })
-            }
+            await safeErrorReply(interaction, "處理按鈕時發生錯誤。")
         }
         return
     }
@@ -82,6 +83,8 @@ export const action = async(interaction) => {
 
     const appStore = useAppStore()
     const action = appStore.commandsActionMap.get(interaction.commandName)
+    const commandMeta = appStore.commandMetaMap?.get(interaction.commandName)
+    const requiredPermission = commandMeta?.requiredPermission ?? "user"
 
     if (!action) {
         // 備註: 防止未註冊指令造成 runtime error
@@ -92,15 +95,28 @@ export const action = async(interaction) => {
         return
     }
 
+    const canUse = await hasPermission({
+        guildId: interaction.guildId ?? "global",
+        userId: interaction.user.id,
+        required: requiredPermission,
+    })
+    if (!canUse) {
+        const current = await getUserPermissionLevel({
+            guildId: interaction.guildId ?? "global",
+            userId: interaction.user.id,
+        })
+        await interaction.reply({
+            content: `你沒有權限使用此指令。需要: ${requiredPermission}，目前: ${current}`,
+            flags: MessageFlags.Ephemeral,
+        })
+        return
+    }
+
     try {
         await action(interaction)
     } catch (err) {
         console.error(`執行指令失敗: ${interaction.commandName}`, err)
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: '執行指令時發生錯誤。', flags: MessageFlags.Ephemeral })
-        } else {
-            await interaction.reply({ content: '執行指令時發生錯誤。', flags: MessageFlags.Ephemeral })
-        }
+        await safeErrorReply(interaction, "執行指令時發生錯誤。")
     }
 }
 

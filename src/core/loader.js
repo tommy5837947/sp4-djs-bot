@@ -40,6 +40,9 @@ const ensureStoreMaps = (appStore) => {
     if (!appStore.commandsActionMap) {
         appStore.commandsActionMap = markRaw(new Collection());
     }
+    if (!appStore.commandMetaMap) {
+        appStore.commandMetaMap = markRaw(new Map());
+    }
     if (!appStore.eventHandlerMap) {
         appStore.eventHandlerMap = markRaw(new Map());
     }
@@ -81,15 +84,20 @@ export const loadCommands = async ({ name } = {}) => {
 
     const commands = [];
     const actions = new Collection();
+    const metas = new Map();
     for (const file of files) {
         const cmd = await importFresh(file);
         commands.push(cmd.command.toJSON());
         actions.set(cmd.command.name, cmd.action);
+        metas.set(cmd.command.name, {
+            requiredPermission: cmd.requiredPermission ?? "user",
+        });
     }
 
     const guildId = process.env.GUILD_ID || "728914201766133790";
     await updateSlashCommands(guildId, commands);
     appStore.commandsActionMap = markRaw(actions);
+    appStore.commandMetaMap = markRaw(metas);
 
     return {
         reloaded: name ? [name] : folderNames,

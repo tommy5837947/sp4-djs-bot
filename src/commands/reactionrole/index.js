@@ -2,6 +2,8 @@ import { EmbedBuilder, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } 
 import { upsertButtonRoleBinding } from "@/core/buttonRoles";
 import { useAppStore } from "@/store/app";
 
+export const requiredPermission = "admin";
+
 export const command = new SlashCommandBuilder()
     .setName("reactionrole")
     .setDescription("建立按鈕身份組規則（支援 ephemeral 提示）")
@@ -79,6 +81,16 @@ const parseMessageRef = (value) => {
 
 const normalizePanelText = (value) => String(value ?? "").replace(/\\n/g, "\n").trim();
 
+const resolveGuildEmojiAlias = (guild, text) => {
+    if (!guild) return text;
+    // 支援把 :emoji_name: 轉為 <:emoji_name:id> 或 <a:emoji_name:id>
+    return text.replace(/:([a-zA-Z0-9_]+):/g, (full, emojiName) => {
+        const emoji = guild.emojis.cache.find((e) => e.name === emojiName);
+        if (!emoji) return full;
+        return `<${emoji.animated ? "a" : ""}:${emoji.name}:${emoji.id}>`;
+    });
+};
+
 export const action = async (ctx) => {
     if (!ctx.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
         await ctx.reply({ content: "你沒有 Manage Roles 權限。", flags: MessageFlags.Ephemeral });
@@ -119,7 +131,8 @@ export const action = async (ctx) => {
 
         if (sub === "create") {
             const raw = ctx.options.getString("message", true);
-            const description = normalizePanelText(raw);
+            const normalized = normalizePanelText(raw);
+            const description = resolveGuildEmojiAlias(ctx.guild, normalized);
             if (style === "plain") {
                 targetMessage = await targetChannel.send({
                     content: description || "請點選下方按鈕切換身份組。",
@@ -128,7 +141,6 @@ export const action = async (ctx) => {
             } else {
                 const panelEmbed = new EmbedBuilder()
                     .setColor(0x4f8cff)
-                    .setTitle("身份組選單")
                     .setDescription(description || "請點選下方按鈕切換身份組。")
                     .setFooter({ text: "點擊按鈕即可新增/移除身份組" });
                 targetMessage = await targetChannel.send({ embeds: [panelEmbed], components: [] });

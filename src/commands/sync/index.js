@@ -1,5 +1,7 @@
-import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { syncFeatures } from "@/core/loader";
+
+export const requiredPermission = "admin";
 
 export const command = new SlashCommandBuilder()
     .setName("sync")
@@ -17,11 +19,6 @@ export const command = new SlashCommandBuilder()
     );
 
 export const action = async (ctx) => {
-    if (!ctx.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        await ctx.reply({ content: "你沒有權限使用 /sync。", flags: MessageFlags.Ephemeral });
-        return;
-    }
-
     const scope = ctx.options.getString("scope") ?? "all";
 
     await ctx.deferReply({ flags: MessageFlags.Ephemeral });

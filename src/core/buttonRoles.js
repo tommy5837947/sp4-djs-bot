@@ -52,18 +52,50 @@ const ensureConfig = (data, { guildId, channelId, messageId }) => {
 
 const buildButtonCustomId = (roleId) => `br:role:${roleId}`;
 
+const parseEmojiAndLabel = (rawLabel) => {
+    const text = String(rawLabel ?? "").trim();
+    // 支援格式: <:name:id> 文字  或  <a:name:id> 文字
+    const match = text.match(/^<(a?):([a-zA-Z0-9_]+):(\d+)>\s*(.*)$/);
+    if (!match) {
+        return {
+            label: text,
+            emoji: null,
+        };
+    }
+
+    const [, animatedFlag, name, id, rest] = match;
+    return {
+        label: rest.trim(),
+        emoji: {
+            id,
+            name,
+            animated: animatedFlag === "a",
+        },
+    };
+};
+
 const buildRows = (buttons) => {
     const rows = [];
     for (let i = 0; i < buttons.length; i += 5) {
         const row = new ActionRowBuilder();
         const chunk = buttons.slice(i, i + 5);
         for (const btn of chunk) {
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(btn.customId)
-                    .setLabel(btn.label)
-                    .setStyle(ButtonStyle.Secondary),
-            );
+            const parsed = parseEmojiAndLabel(btn.label);
+            const button = new ButtonBuilder()
+                .setCustomId(btn.customId)
+                .setStyle(ButtonStyle.Secondary);
+
+            if (parsed.emoji) {
+                button.setEmoji(parsed.emoji);
+            }
+            if (parsed.label) {
+                button.setLabel(parsed.label);
+            } else if (!parsed.emoji) {
+                // 理論上不會進到這裡（label 在指令層為必填），保底避免無效按鈕
+                button.setLabel("按鈕");
+            }
+
+            row.addComponents(button);
         }
         rows.push(row);
     }

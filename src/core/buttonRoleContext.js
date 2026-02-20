@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { upsertButtonRoleBinding } from "@/core/buttonRoles";
 import { useAppStore } from "@/store/app";
+import { hasPermission } from "@/core/permissions";
 
 const CONTEXT_PREFIX = "br:ctx:";
 const MODAL_PREFIX = "br:modal:";
@@ -75,6 +76,21 @@ export const isButtonRoleContextModal = (interaction) =>
     interaction.isModalSubmit() && interaction.customId.startsWith(MODAL_PREFIX);
 
 export const handleButtonRoleContextModal = async (interaction) => {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+        await interaction.reply({ content: "你沒有 Manage Roles 權限。", flags: MessageFlags.Ephemeral });
+        return;
+    }
+
+    const internalAllowed = await hasPermission({
+        guildId: interaction.guildId ?? "global",
+        userId: interaction.user.id,
+        required: "admin",
+    });
+    if (!internalAllowed) {
+        await interaction.reply({ content: "你的機器人權限不足（需要 admin）。", flags: MessageFlags.Ephemeral });
+        return;
+    }
+
     const payload = interaction.customId.slice(MODAL_PREFIX.length);
     const [channelId, messageId] = payload.split(":");
     if (!channelId || !messageId) {
@@ -151,4 +167,3 @@ export const handleButtonRoleContextModal = async (interaction) => {
 
 export const BUTTON_ROLE_CONTEXT_NAME = "Bind Role Button";
 export const BUTTON_ROLE_CONTEXT_PREFIX = CONTEXT_PREFIX;
-

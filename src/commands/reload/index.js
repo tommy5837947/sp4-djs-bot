@@ -1,5 +1,7 @@
-import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { reloadFeatures } from "@/core/loader";
+
+export const requiredPermission = "admin";
 
 export const command = new SlashCommandBuilder()
     .setName("reload")
@@ -25,11 +27,6 @@ export const command = new SlashCommandBuilder()
     );
 
 export const action = async (ctx) => {
-    if (!ctx.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        await ctx.reply({ content: "你沒有權限使用 /reload。", flags: MessageFlags.Ephemeral });
-        return;
-    }
-
     const scope = ctx.options.getString("scope", true);
     const name = ctx.options.getString("name") ?? undefined;
 
